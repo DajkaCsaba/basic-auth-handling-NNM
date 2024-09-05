@@ -1,3 +1,11 @@
+import TitleAtom from '@/fe/components/atoms/title.atom';
+
 export default function LoadingSignUpFormSection() {
-  return <div>Loading Sign up form section...</div>;
+  return (
+    <TitleAtom
+      center
+      className="animate-bounce"
+      title="Loading Sign up form section..."
+    />
+  );
 }

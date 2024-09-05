@@ -50,11 +50,11 @@ const LabeledInputMolecule = ({
   return (
     <div
       style={{ flex: flex }}
-      className={`${className} flex flex-col gap-small-landscape`}
+      className={`${className} flex flex-col portrait:gap:xxs gap-xxsl`}
     >
       <RowAtom className="justify-between">
         <TextAtom
-          className={`${className}`}
+          className={`${className} text-dominant`}
           size={size}
           inset="none"
           bold

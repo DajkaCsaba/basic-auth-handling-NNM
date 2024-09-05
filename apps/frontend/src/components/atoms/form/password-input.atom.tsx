@@ -20,17 +20,17 @@ type Props = {
 } & InsetProps &
   SpacingProps;
 
-const BASE = `w-full border border-secondary text-dominant bg-transparent placeholder:text-secondary focus:outline-none `;
+const BASE = `w-full border border-dominant text-secondary bg-transparent placeholder:text-dominant focus:outline-none `;
 const LANDSCAPE = 'border-sml rounded-sml pr-mdl';
 const PORTRAIT = 'portrait:border-sm portrait:rounded-sm portrait:pr-md';
 
-  /**
-   * PasswordInputAtom is a component that renders a password input element,
-   * with optional styling and features.
-   *
-   * @param {Props} props The component props.
-   * @returns {JSX.Element} The rendered password input element.
-   */
+/**
+ * PasswordInputAtom is a component that renders a password input element,
+ * with optional styling and features.
+ *
+ * @param {Props} props The component props.
+ * @returns {JSX.Element} The rendered password input element.
+ */
 export default function PasswordInputAtom({
   placeholder,
   onEnter,
@@ -75,7 +75,11 @@ export default function PasswordInputAtom({
         onClick={toggleIsHidden}
         className={'absolute right-0 top-1/2 -translate-y-1/2 -translate-x-1/4'}
       >
-        {isHidden ? <EyeIcon /> : <ClosedEyeIcon />}
+        {isHidden ? (
+          <EyeIcon className="stroke-dominant" />
+        ) : (
+          <ClosedEyeIcon className="stroke-dominant" />
+        )}
       </ColumnAtom>
     </div>
   );

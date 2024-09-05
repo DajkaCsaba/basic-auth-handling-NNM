@@ -22,7 +22,7 @@ type Props = {
 } & InsetProps &
   SpacingProps;
 
-const BASE = `w-full border border-secondary text-dominant bg-transparent placeholder:text-secondary focus:outline-none`;
+const BASE = `w-full border border-dominant text-secondary bg-transparent placeholder:text-dominant focus:outline-none`;
 const LANDSCAPE = 'border-sml rounded-sml';
 const PORTRAIT = 'portrait:border-sm portrait:rounded-sm';
 

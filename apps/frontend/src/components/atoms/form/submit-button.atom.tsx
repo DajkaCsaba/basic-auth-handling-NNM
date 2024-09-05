@@ -55,7 +55,7 @@ export const SubmitButtonAtom = ({
   pendingText,
   isPending = false,
   role = 'normal',
-  type = 'outlined',
+  type = 'filled',
   size = 'base',
   ...props
 }: Props): JSX.Element => {
