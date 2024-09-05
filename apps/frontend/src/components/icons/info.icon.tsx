@@ -1,12 +1,25 @@
 import React from 'react';
 import { ICON_SIZES, Size } from '@/fe/utils/style/dynamic-sizes';
+import { Component } from '@/fe/utils/aliases.types';
 
 type Props = {
   className?: string;
   size?: Size;
 };
 
-export const InfoIcon = ({ className = 'fill-accent', size = 'sm' }: Props) => {
+
+/**
+ * Icon for displaying information.
+ *
+ * @param {Object} props Component props
+ * @param {TailwindStyle} [props.className=fill-accent] CSS class names to apply to the outermost element
+ * @param {Size} [props.size=sm] Size of the icon
+ * @returns {React.ReactNode} Icon component
+ */
+export const InfoIcon = ({
+  className = 'fill-accent',
+  size = 'sm',
+}: Props): Component => {
   return (
     <svg
       width="35"

@@ -7,6 +7,14 @@ type Props = {
   size?: Size;
 };
 
+  /**
+   * An eye icon.
+   *
+   * @prop {TailwindStyle} className - Class name to be appended to the component.
+   * @prop {Size} size - Icon size.
+   *
+   * @returns {Component} An eye icon.
+   */
 export default function EyeIcon({
   className = 'stroke-accent',
   size = 'sm',

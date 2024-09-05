@@ -56,6 +56,7 @@ export class AuthService {
         },
         data: {
           password: bcryptjs.hashSync(password),
+          resetPasswordToken: null,
         },
       });
       return this.authMapper.encryptedToDecripted(dao);

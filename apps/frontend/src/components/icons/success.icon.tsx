@@ -1,22 +1,31 @@
-import { iconSizes, Size } from '@/fe/utils/style/dynamic-sizes';
+import { Component, TailwindStyle } from '@/fe/utils/aliases.types';
+import { ICON_SIZES, Size } from '@/fe/utils/style/dynamic-sizes';
 import React from 'react';
 
 type Props = {
-  style?: string;
+  className?: TailwindStyle;
   size?: Size;
 };
 
-export const SuccessIcon = ({
-  style = 'fill-[#5EDD60]',
-  size = 'small',
-}: Props) => {
+/**
+ * A success icon.
+ *
+ * @prop {TailwindStyle} [className=fill-pageGreen] - Icon style.
+ * @prop {Size} [size=sm] - Icon size.
+ *
+ * @returns {Component} A success icon.
+ */
+export default function SuccessIcon({
+  className = 'fill-pageGreen',
+  size = 'sm',
+}: Props): Component {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       width="40"
       height="40"
       viewBox="0 0 40 40"
-      className={`${style} ${iconSizes[size]}`}
+      className={`${className} ${ICON_SIZES[size]}`}
     >
       <path
         fillRule="evenodd"
@@ -25,4 +34,4 @@ export const SuccessIcon = ({
       />
     </svg>
   );
-};
+}

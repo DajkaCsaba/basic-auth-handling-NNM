@@ -1,113 +1,100 @@
 'use client';
 
-import Image from 'next/legacy/image';
-import toast from 'react-hot-toast';
-import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import TitleAtom from '@/fe/components/atoms/title.atom';
-import InputAtom from '@/fe/components/atoms/form/input.atom';
-import { ButtonAtom } from '@/fe/components/atoms/button/button.atom';
-import { setPasswordTokens, workerTokens } from '@/fe/tokens';
-import { setPasswordMutation } from '@/fe/server/mutations/auth/set-password.mutation';
-
-import logo from '../../../../public/img/RentNDeal.png';
 import { ColumnAtom } from '@/fe/components/atoms/layout/column.atom';
+import PasswordInputAtom from '@/fe/components/atoms/form/password-input.atom';
+import { SubmitButtonAtom } from '@/fe/components/atoms/form/submit-button.atom';
+import { z } from 'zod';
+import { SubmitHandler, useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import LabeledInputMolecule from '@/fe/components/molecules/labeled-input.molecule';
+import ErrorMessageAtom from '@/fe/components/atoms/form/error-message.atom';
+import { useSetPassword } from '@/fe/data-access/auth';
+import toast from 'react-hot-toast';
 
-export type FormState = {
+export type SetPasswordFormFields = {
   password: string;
   confirmPassword: string;
 };
 
-const initialState: FormState = {
-  password: '',
-  confirmPassword: '',
-};
+const schema: z.Schema<SetPasswordFormFields> = z.object({
+  password: z.string().min(6),
+  confirmPassword: z.string().min(6),
+});
 
-const ModifyPasswordPage = ({ params }: { params: { token: string } }) => {
-  const [formState, setFormState] = useState<FormState>(initialState);
-  const [isLoading, setLoading] = useState<boolean>(false);
-
+export default function ModifyPasswordPage({
+  params,
+}: {
+  params: { token: string };
+}) {
+  const {
+    register,
+    handleSubmit,
+    getValues,
+    formState: { errors, isLoading },
+  } = useForm<SetPasswordFormFields>({
+    resolver: zodResolver(schema),
+  });
   const router = useRouter();
 
-  const onSetPassword = async () => {
-    setLoading(true);
-    const toastId = toast.loading(workerTokens.create_loading);
+  const onSetPassword = useSetPassword(params.token, getValues());
 
-    if (formState.password !== formState.confirmPassword) {
-      toast.error(setPasswordTokens.not_match, { id: toastId });
-      setLoading(false);
-      return;
+  const onSubmit: SubmitHandler<SetPasswordFormFields> = async (data) => {
+    if (data.password !== data.confirmPassword) {
+      toast.error('Passwords do not match');
+      return null;
     }
-
-    setPasswordMutation(params.token, formState.password)
-      .then((res) => {
-        if (res.error) {
-          toast.error(res.error, { id: toastId });
-          return null;
-        }
-        if (res.unexpected) {
-          console.error(res.unexpected);
-          toast.error(setPasswordTokens.unexpected_error, {
-            id: toastId,
-          });
-          return null;
-        }
-        toast.success(res.success ?? '', { id: toastId });
-        router.push('/');
-      })
-      .finally(() => setLoading(false));
-  };
-
-  const onChangePassword = (value: string) => {
-    setFormState((prev) => ({ ...prev, password: value }));
-  };
-
-  const onChangeConfirmPassword = (value: string) => {
-    setFormState((prev) => ({ ...prev, confirmPassword: value }));
+    try {
+      onSetPassword();
+      router.push('/auth/login');
+    } catch (error) {
+      console.error(error);
+    }
   };
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center portrait:p-[8.89vh] p-[5.00vw]">
-      <ColumnAtom style={'items-center'}>
-        <div className="relative w-[43.75vw] h-[19.11vw]">
-          <Image alt="set-password-logo" src={logo} className="" layout="fill" />
-        </div>
+      <ColumnAtom className={'items-center'}>
         <TitleAtom
-          style={' uppercase font-[900]  tracking-wider'}
-          text={setPasswordTokens.title}
+          className={'font-[900]  tracking-wider'}
+          size="xl"
+          title={'LogoBigHere'}
+        />
+        <TitleAtom
+          className={' uppercase font-[900]  tracking-wider'}
+          title={'Set Password'}
         />
       </ColumnAtom>
-      
-        
-      <div className="portrait:w-[40vh] w-[26.04vw] flex flex-col portrait:gap-base gap-base-landscape portrait:my-large my-large-landscape portrait:text-base text-base-landscape">
-        <InputAtom
-          id="password"
-          placeholder={setPasswordTokens.password}
-          type="password"
-          value={formState.password}
-          onChange={onChangePassword}
-        />
-        <InputAtom
-          id="confirmPassword"
-          placeholder={setPasswordTokens.confirm_password}
-          type="password"
-          value={formState.confirmPassword}
-          onChange={onChangeConfirmPassword}
-        />
+
+      <form
+        onSubmit={handleSubmit(onSubmit)}
+        className="portrait:w-[40vh] w-[26.04vw] flex flex-col portrait:gap-base gap-basel portrait:my-lg my-lgl"
+      >
+        <LabeledInputMolecule label="Password">
+          <PasswordInputAtom
+            register={register('password')}
+            inset="xxs"
+            placeholder={'***********'}
+          />
+          <ErrorMessageAtom message={errors.password?.message} />
+        </LabeledInputMolecule>
+        <LabeledInputMolecule label="Confirm Password">
+          <PasswordInputAtom
+            register={register('confirmPassword')}
+            inset="xxs"
+            placeholder={'***********'}
+          />
+          <ErrorMessageAtom message={errors.confirmPassword?.message} />
+        </LabeledInputMolecule>
         {!isLoading && (
-          <ButtonAtom
-            onClick={onSetPassword}
-            inset='base'
-            size='base'            
-            style="border-base-secondary text-base-secondary hover:bg-base-secondary hover:text-base-accent"
-            disabled={isLoading}
-          >
-            {setPasswordTokens.submit_button}
-          </ButtonAtom>
+          <SubmitButtonAtom
+            inset="xxs"
+            pendingText="Set password loading..."
+            text="Set password"
+          />
         )}
-      </div>
+      </form>
     </main>
   );
-};
-
-export default ModifyPasswordPage;
+}

@@ -6,7 +6,7 @@ import { ColumnAtom } from '@/fe/components/atoms/layout/column.atom';
 import { useSession } from 'next-auth/react';
 import TextAtom from '@/fe/components/atoms/text.atom';
 import TitleAtom from '../atoms/title.atom';
-import { LogoutIcon } from '../icons/logout';
+import LogoutIcon from '@/fe/components/icons/logout';
 
 export const Header = () => {
   const { data: session } = useSession();
@@ -42,7 +42,7 @@ export const Header = () => {
                 className={'portrait:hidden text-accent !font-[900]'}
                 text={'Logout'}
               />
-              <LogoutIcon size="md" style="landscape:hidden fill-accent" />
+              <LogoutIcon size="md" className="landscape:hidden fill-accent" />
             </Link>
           </ColumnAtom>
         </div>

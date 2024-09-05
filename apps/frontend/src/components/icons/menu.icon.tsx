@@ -1,20 +1,31 @@
-import { Size, iconSizes } from '@/fe/utils/style/dynamic-sizes';
-import { TailwindStyle } from '@/fe/utils/aliases.types';
+import { Size, ICON_SIZES } from '@/fe/utils/style/dynamic-sizes';
+import { Component, TailwindStyle } from '@/fe/utils/aliases.types';
 import React from 'react';
 
 type Props = {
-  style?: TailwindStyle;
+  className?: TailwindStyle;
   size?: Size;
 };
 
-export const MenuIcon = ({ style = 'stroke-white', size = 'small' }: Props) => {
+/**
+ * A menu icon.
+ *
+ * @prop {Size} [size=sm] - Icon size.
+ * @prop {TailwindStyle} [className=stroke-white] - Icon style.
+ *
+ * @returns {Component} A menu icon.
+ */
+export default function MenuIcon({
+  className = 'stroke-white',
+  size = 'sm',
+}: Props): Component {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
       width="45"
       height="45"
       viewBox="0 0 45 45"
-      className={`${style} ${iconSizes[size]} `}
+      className={`${className} ${ICON_SIZES[size]} `}
     >
       <path
         xmlns="http://www.w3.org/2000/svg"
@@ -24,4 +35,4 @@ export const MenuIcon = ({ style = 'stroke-white', size = 'small' }: Props) => {
       />
     </svg>
   );
-};
+}
