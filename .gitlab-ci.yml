@@ -1,0 +1,474 @@
+default:
+  image: node:iron-alpine3.18
+
+include:
+  - local: ".gitlab/caches.yml"
+  - local: ".gitlab/utils.yml"
+
+# Only run pipeline for either a branch, or a merge_request
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "web"
+      when: always
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - if: $CI_COMMIT_BRANCH || $CI_COMMIT_TAG
+
+stages:
+  - test
+  - build
+  - docker
+  - deploy
+
+# TEST
+test:
+  stage: test
+  extends:
+    - .setup-pnpm
+    - .pnpm-read-cache
+  script:
+    - pnpm install --frozen-lockfile --prefer-offline
+    - cp $ENV_FE_DEMO apps/frontend/.env
+    - pnpm run prisma:generate
+    - pnpm run lint:all
+    - pnpm run test:all
+
+
+# BUILD                                                                   #
+###########################################################################
+# DEMO
+build:dev:
+  stage: build
+  extends:
+    - .setup-pnpm
+    - .pnpm-read-cache
+  script:
+    - pnpm install --frozen-lockfile --prefer-offline
+    - pnpm run prisma:generate
+    - cp $ENV_FE_DEMO apps/frontend/.env
+    # build
+    - pnpm nx run-many --parallel --target=build --configuration=production --all --skip-nx-cache
+  artifacts:
+    paths:
+      - dist/apps/backend
+      - dist/apps/frontend
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: always
+    - if: $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH
+      when: always
+  allow_failure: true
+
+# PRD
+build:prd:
+  stage: build
+  extends:
+    - .setup-pnpm
+    - .pnpm-read-cache
+  script:
+    - pnpm install --frozen-lockfile --prefer-offline
+    - pnpm run prisma:generate
+    - cp $ENV_FE_PRD apps/frontend/.env
+    # build
+    - pnpm nx run-many --parallel --target=build --configuration=production --all --skip-nx-cache
+  artifacts:
+    paths:
+      - dist/apps/backend
+      - dist/apps/frontend
+  when: manual
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+# DOCKER                                                                   #
+###########################################################################
+
+# DEMO / DEV
+docker:backend:dev:
+  stage: docker
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [ "" ]
+  variables:
+    GODEBUG: "http2client=0"
+    IMAGE: ${CI_REGISTRY_IMAGE}/dev/backend:latest
+  script:
+    # Create a .docker directory and put the config.json with credentials in it
+    - mkdir -p /kaniko/.docker
+    - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
+    # Use Kaniko to build and push the image
+    - /kaniko/executor --single-snapshot --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/docker/backend.Dockerfile --destination $IMAGE
+  artifacts:
+    paths:
+      - dist/apps/backend
+  needs: [ "build:dev" ]
+  dependencies:
+    - build:dev
+  when: manual
+  allow_failure: true
+
+docker:frontend:dev:
+  stage: docker
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [ "" ]
+  variables:
+    GODEBUG: "http2client=0"
+    IMAGE: ${CI_REGISTRY_IMAGE}/dev/frontend:latest
+  script:
+    # Create a .docker directory and put the config.json with credentials in it
+    - mkdir -p /kaniko/.docker
+    - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
+    # Use Kaniko to build and push the image
+    - /kaniko/executor --single-snapshot --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/docker/frontend.Dockerfile --destination $IMAGE
+  artifacts:
+    paths:
+      - dist/apps/frontend
+  needs: [ "build:dev" ]
+  dependencies:
+    - build:dev
+  when: manual
+  allow_failure: true
+
+## Utils
+
+docker:backend:migrate-safe:
+  stage: docker
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [ "" ]
+  variables:
+    GODEBUG: "http2client=0"
+    IMAGE: ${CI_REGISTRY_IMAGE}/dev/migrate-safe:latest
+  script:
+    # Create a .docker directory and put the config.json with credentials in it
+    - mkdir -p /kaniko/.docker
+    - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
+    # Use Kaniko to build and push the image
+    - /kaniko/executor --single-snapshot --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/docker/migrate-safe.Dockerfile --destination $IMAGE
+  artifacts:
+    paths:
+      - dist/apps/backend
+  needs: [ "build:dev" ]
+  dependencies:
+    - build:dev
+  when: manual
+  allow_failure: true
+
+docker:backend:migrate-unsafe:
+  stage: docker
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [ "" ]
+  variables:
+    GODEBUG: "http2client=0"
+    IMAGE: ${CI_REGISTRY_IMAGE}/dev/migrate-unsafe:latest
+  script:
+    # Create a .docker directory and put the config.json with credentials in it
+    - mkdir -p /kaniko/.docker
+    - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
+    # Use Kaniko to build and push the image
+    - /kaniko/executor --single-snapshot --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/docker/migrate-unsafe.Dockerfile --destination $IMAGE
+  artifacts:
+    paths:
+      - dist/apps/backend
+  needs: [ "build:dev" ]
+  dependencies:
+    - build:dev
+  when: manual
+  allow_failure: true
+
+# This two jobs are needed because of different schema files
+docker:backend:migrate-safe:prd:
+  stage: docker
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [ "" ]
+  variables:
+    GODEBUG: "http2client=0"
+    IMAGE: ${CI_REGISTRY_IMAGE}/prd/migrate-safe:latest
+  script:
+    # Create a .docker directory and put the config.json with credentials in it
+    - mkdir -p /kaniko/.docker
+    - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
+    # Use Kaniko to build and push the image
+    - /kaniko/executor --single-snapshot --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/docker/migrate-safe.Dockerfile --destination $IMAGE
+  artifacts:
+    paths:
+      - dist/apps/backend
+  needs: [ "build:prd" ]
+  dependencies:
+    - build:prd
+  when: manual
+  allow_failure: true
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+docker:backend:migrate-unsafe:prd:
+  stage: docker
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [ "" ]
+  variables:
+    GODEBUG: "http2client=0"
+    IMAGE: ${CI_REGISTRY_IMAGE}/prd/migrate-unsafe:latest
+  script:
+    # Create a .docker directory and put the config.json with credentials in it
+    - mkdir -p /kaniko/.docker
+    - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
+    # Use Kaniko to build and push the image
+    - /kaniko/executor --single-snapshot --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/docker/migrate-unsafe.Dockerfile --destination $IMAGE
+  artifacts:
+    paths:
+      - dist/apps/backend
+  needs: [ "build:prd" ]
+  dependencies:
+    - build:prd
+  when: manual
+  allow_failure: true
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+# PRD
+docker:backend:prd:
+  stage: docker
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [ "" ]
+  variables:
+    GODEBUG: "http2client=0"
+    IMAGE: ${CI_REGISTRY_IMAGE}/prd/backend:latest
+    COMMIT_IMAGE: ${CI_REGISTRY_IMAGE}/prd/backend:${CI_COMMITH_HASH}
+  script:
+    # Create a .docker directory and put the config.json with credentials in it
+    - mkdir -p /kaniko/.docker
+    - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
+    # Use Kaniko to build and push the image
+    - /kaniko/executor --single-snapshot --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/docker/backend.Dockerfile --destination $IMAGE --destination $COMMIT_IMAGE
+  artifacts:
+    paths:
+      - dist/apps/backend
+  needs: [ "build:prd" ]
+  dependencies:
+    - build:prd
+  when: manual
+  allow_failure: true
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+docker:frontend:prd:
+  stage: docker
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [ "" ]
+  variables:
+    GODEBUG: "http2client=0"
+    IMAGE: ${CI_REGISTRY_IMAGE}/prd/frontend:latest
+    COMMIT_IMAGE: ${CI_REGISTRY_IMAGE}/prd/frontend:${CI_COMMIT_HASH}
+  script:
+    # Create a .docker directory and put the config.json with credentials in it
+    - mkdir -p /kaniko/.docker
+    - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
+    # Use Kaniko to build and push the image
+    - /kaniko/executor --single-snapshot --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/docker/frontend.Dockerfile --destination $IMAGE --destination $COMMIT_IMAGE
+  artifacts:
+    paths:
+      - dist/apps/frontend
+  needs: [ "build:prd" ]
+  dependencies:
+    - build:prd
+  when: manual
+  allow_failure: true
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+# DEPLOY                                                                   #
+###########################################################################
+deploy:dev:
+  stage: deploy
+  image: alpine:latest
+  variables:
+    HOME_FOLDER: /home/hoster/hosting/ot-dev
+  environment:
+    name: Development
+    url: https://ot.dev.kingmakerstudio.hu
+  script:
+    - apk add openssh
+    - cp $PRIV_KEY_DEV /tmp/sshkey
+    - chmod 600 /tmp/sshkey
+
+    - ssh -p ${SERVER_SSH_PORT} -i /tmp/sshkey -o StrictHostKeyChecking=no ${SERVER_SSH_USER}@${DEV_SERVER_HOST} "docker login -u "${CI_REGISTRY_USER}" -p "${CI_REGISTRY_PASSWORD}" "${CI_REGISTRY}""
+
+    - echo "Pulling Docker images:"
+    - ssh -p ${SERVER_SSH_PORT} -i /tmp/sshkey -o StrictHostKeyChecking=no ${SERVER_SSH_USER}@${DEV_SERVER_HOST} \
+      "cd ${HOME_FOLDER} && docker compose pull"
+
+
+    - echo "Starting containers:"
+    - ssh -p ${SERVER_SSH_PORT} -i /tmp/sshkey -o StrictHostKeyChecking=no ${SERVER_SSH_USER}@${DEV_SERVER_HOST} \
+      "cd ${HOME_FOLDER} && docker compose up -d"
+  allow_failure: true
+  when: manual
+
+
+migrate:dev:safe:
+  stage: deploy
+  image: alpine:latest
+  variables:
+    IMG_NAME: registry.gitlab.com/masterkeys/orange-trailers-hu/dev/migrate-safe:latest
+    HOME_FOLDER: /home/hoster/hosting/ot-dev
+    NETWORK: ot-dev-net
+  environment:
+    name: Development
+    url: https://ot.dev.kingmakerstudio.hu
+  script:
+    - apk add openssh
+    - cp $PRIV_KEY_DEV /tmp/sshkey
+    - chmod 600 /tmp/sshkey
+
+    # Must make sure the db is running:
+    - ssh -p ${SERVER_SSH_PORT} -i /tmp/sshkey -o StrictHostKeyChecking=no ${SERVER_SSH_USER}@${DEV_SERVER_HOST} \
+      "cd ${HOME_FOLDER} && docker compose up ot-dev-db -d"
+
+    - ssh -p ${SERVER_SSH_PORT} -i /tmp/sshkey -o StrictHostKeyChecking=no ${SERVER_SSH_USER}@${DEV_SERVER_HOST} "docker login -u "${CI_REGISTRY_USER}" -p "${CI_REGISTRY_PASSWORD}" "${CI_REGISTRY}""
+
+    - echo "Pushing db (not forced):"
+    - ssh -p ${SERVER_SSH_PORT} -i /tmp/sshkey -o StrictHostKeyChecking=no ${SERVER_SSH_USER}@${DEV_SERVER_HOST} \
+      "cd ${HOME_FOLDER} && docker pull $IMG_NAME"
+
+    - ssh -p ${SERVER_SSH_PORT} -i /tmp/sshkey -o StrictHostKeyChecking=no ${SERVER_SSH_USER}@${DEV_SERVER_HOST} \
+      "cd ${HOME_FOLDER} && docker run --rm --network ${NETWORK} --env-file ./.env.backend $IMG_NAME"
+  dependencies:
+    - docker:backend:migrate-safe
+  allow_failure: true
+  when: manual
+
+migrate:dev:unsafe:
+  stage: deploy
+  image: alpine:latest
+  variables:
+    IMG_NAME: registry.gitlab.com/masterkeys/orange-trailers-hu/dev/migrate-unsafe:latest
+    HOME_FOLDER: /home/hoster/hosting/ot-dev
+    NETWORK: ot-dev-net
+  environment:
+    name: Development
+    url: https://ot.dev.kingmakerstudio.hu
+  script:
+    - apk add openssh
+    - cp $PRIV_KEY_DEV /tmp/sshkey
+    - chmod 600 /tmp/sshkey
+
+    # Must make sure the db is running:
+    - ssh -p ${SERVER_SSH_PORT} -i /tmp/sshkey -o StrictHostKeyChecking=no ${SERVER_SSH_USER}@${DEV_SERVER_HOST} \
+      "cd ${HOME_FOLDER} && docker compose up ot-dev-db -d"
+
+    - ssh -p ${SERVER_SSH_PORT} -i /tmp/sshkey -o StrictHostKeyChecking=no ${SERVER_SSH_USER}@${DEV_SERVER_HOST} "docker login -u "${CI_REGISTRY_USER}" -p "${CI_REGISTRY_PASSWORD}" "${CI_REGISTRY}""
+
+    - echo "Pushing db (forced):"
+    - ssh -p ${SERVER_SSH_PORT} -i /tmp/sshkey -o StrictHostKeyChecking=no ${SERVER_SSH_USER}@${DEV_SERVER_HOST} \
+      "cd ${HOME_FOLDER} && docker pull $IMG_NAME"
+
+    - ssh -p ${SERVER_SSH_PORT} -i /tmp/sshkey -o StrictHostKeyChecking=no ${SERVER_SSH_USER}@${DEV_SERVER_HOST} \
+      "cd ${HOME_FOLDER} && docker run --rm --network ${NETWORK} --env-file ./.env.backend $IMG_NAME"
+  dependencies:
+    - docker:backend:migrate-unsafe
+  allow_failure: true
+  when: manual
+
+# PRD
+deploy:prd:
+  stage: deploy
+  image: alpine:latest
+  variables:
+    HOME_FOLDER: /home/hoster/hosting/ot-prd
+  environment:
+    name: Production
+    url: https://partnerportal.orangefutok.hu
+  script:
+    - apk add openssh
+    - cp $PRIV_KEY_PRD /tmp/sshkey
+    - chmod 600 /tmp/sshkey
+
+    - ssh -p ${PRD_SERVER_SSH_PORT} -i /tmp/sshkey -o StrictHostKeyChecking=no ${PRD_SERVER_SSH_USER}@${PRD_SERVER_HOST} "docker login -u "${CI_REGISTRY_USER}" -p "${CI_REGISTRY_PASSWORD}" "${CI_REGISTRY}""
+
+    - echo "Pulling Docker images:"
+    - ssh -p ${PRD_SERVER_SSH_PORT} -i /tmp/sshkey -o StrictHostKeyChecking=no ${PRD_SERVER_SSH_USER}@${PRD_SERVER_HOST} \
+      "cd ${HOME_FOLDER} && docker compose pull"
+
+
+    - echo "Starting containers:"
+    - ssh -p ${PRD_SERVER_SSH_PORT} -i /tmp/sshkey -o StrictHostKeyChecking=no ${PRD_SERVER_SSH_USER}@${PRD_SERVER_HOST} \
+      "cd ${HOME_FOLDER} && docker compose up -d"
+  allow_failure: true
+  when: manual
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+
+migrate:prd:safe:
+  stage: deploy
+  image: alpine:latest
+  variables:
+    IMG_NAME: registry.gitlab.com/masterkeys/orange-trailers-hu/dev/migrate-safe:latest
+    HOME_FOLDER: /home/hoster/hosting/ot-prd
+    NETWORK: ot-prd-net
+  environment:
+    name: Production
+    url: https://partnerportal.orangefutok.hu
+  script:
+    - apk add openssh
+    - cp $PRIV_KEY_PRD /tmp/sshkey
+    - chmod 600 /tmp/sshkey
+
+    # Must make sure the db is running:
+    - ssh -p ${PRD_SERVER_SSH_PORT} -i /tmp/sshkey -o StrictHostKeyChecking=no ${PRD_SERVER_SSH_USER}@${PRD_SERVER_HOST} \
+      "cd ${HOME_FOLDER} && docker compose up ot-prd-db -d"
+
+    - ssh -p ${PRD_SERVER_SSH_PORT} -i /tmp/sshkey -o StrictHostKeyChecking=no ${PRD_SERVER_SSH_USER}@${PRD_SERVER_HOST} "docker login -u "${CI_REGISTRY_USER}" -p "${CI_REGISTRY_PASSWORD}" "${CI_REGISTRY}""
+
+    - echo "Pushing db (not forced):"
+    - ssh -p ${PRD_SERVER_SSH_PORT} -i /tmp/sshkey -o StrictHostKeyChecking=no ${PRD_SERVER_SSH_USER}@${PRD_SERVER_HOST} \
+      "cd ${HOME_FOLDER} && docker pull $IMG_NAME"
+
+    - ssh -p ${PRD_SERVER_SSH_PORT} -i /tmp/sshkey -o StrictHostKeyChecking=no ${PRD_SERVER_SSH_USER}@${PRD_SERVER_HOST} \
+      "cd ${HOME_FOLDER} && docker run --rm --network ${NETWORK} --env-file ./.env.backend.prd $IMG_NAME"
+  dependencies:
+    - docker:backend:migrate-safe:prd
+  allow_failure: true
+  when: manual
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+migrate:prd:unsafe:
+  stage: deploy
+  image: alpine:latest
+  variables:
+    IMG_NAME: registry.gitlab.com/masterkeys/orange-trailers-hu/prd/migrate-unsafe:latest
+    HOME_FOLDER: /home/hoster/hosting/ot-prd
+    NETWORK: ot-prd-net
+  environment:
+    name: Production
+    url: https://partnerportal.orangefutok.hu
+  script:
+    - apk add openssh
+    - cp $PRIV_KEY_PRD /tmp/sshkey
+    - chmod 600 /tmp/sshkey
+
+    # Must make sure the db is running:
+    - ssh -p ${PRD_SERVER_SSH_PORT} -i /tmp/sshkey -o StrictHostKeyChecking=no ${PRD_SERVER_SSH_USER}@${PRD_SERVER_HOST} \
+      "cd ${HOME_FOLDER} && docker compose up ot-prd-db -d"
+
+    - ssh -p ${PRD_SERVER_SSH_PORT} -i /tmp/sshkey -o StrictHostKeyChecking=no ${PRD_SERVER_SSH_USER}@${PRD_SERVER_HOST} "docker login -u "${CI_REGISTRY_USER}" -p "${CI_REGISTRY_PASSWORD}" "${CI_REGISTRY}""
+
+    - echo "Pushing db (forced):"
+    - ssh -p ${PRD_SERVER_SSH_PORT} -i /tmp/sshkey -o StrictHostKeyChecking=no ${PRD_SERVER_SSH_USER}@${PRD_SERVER_HOST} \
+      "cd ${HOME_FOLDER} && docker pull $IMG_NAME"
+
+    - ssh -p ${PRD_SERVER_SSH_PORT} -i /tmp/sshkey -o StrictHostKeyChecking=no ${PRD_SERVER_SSH_USER}@${PRD_SERVER_HOST} \
+      "cd ${HOME_FOLDER} && docker run --rm --network ${NETWORK} --env-file ./.env.backend.prd $IMG_NAME"
+  dependencies:
+    - docker:backend:migrate-unsafe:prd
+  allow_failure: true
+  when: manual
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH

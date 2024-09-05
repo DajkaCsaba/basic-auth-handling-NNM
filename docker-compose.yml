@@ -1,0 +1,18 @@
+services:
+  db:
+    image: mysql:8.3
+    container_name: basic-auth-handling-NNM-mysql
+    #    command: [ "mysqld", "--mysql-native-password=ON" ]
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: basic-auth-handling-NNM
+      MYSQL_ROOT_PASSWORD: supersecret
+    volumes:
+      - './db-data/mysql:/var/lib/mysql'
+    ports:
+      - '3300:3306'
+    networks:
+      - basic-auth-handling-NNM-local
+
+networks:
+  basic-auth-handling-NNM-local:

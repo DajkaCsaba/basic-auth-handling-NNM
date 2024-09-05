@@ -1,0 +1,155 @@
+{
+  "name": "backend",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/backend/src",
+  "projectType": "application",
+  "tags": [],
+  "targets": {
+    "serve": {
+      "executor": "@nx/js:node",
+      "defaultConfiguration": "development",
+      "options": {
+        "buildTarget": "backend:build"
+      },
+      "configurations": {
+        "development": {
+          "buildTarget": "backend:build:development"
+        },
+        "production": {
+          "buildTarget": "backend:build:production"
+        }
+      }
+    },
+    "build": {
+      "executor": "@nx/webpack:webpack",
+      "outputs": ["{options.outputPath}"],
+      "defaultConfiguration": "production",
+      "options": {
+        "target": "node",
+        "compiler": "tsc",
+        "outputPath": "dist/apps/backend",
+        "main": "apps/backend/src/main.ts",
+        "tsConfig": "apps/backend/tsconfig.app.json",
+        "assets": ["apps/backend/src/assets"],
+        "webpackConfig": "apps/backend/webpack.config.ts",
+        "generatePackageJson": true
+      },
+      "configurations": {
+        "development": {},
+        "production": {
+          "extractLicenses": true
+        }
+      }
+    },
+    "db-run": {
+      "executor": "nx:run-commands",
+      "options": {
+        "commands": [
+          {
+            "command": "prisma studio"
+          }
+        ]
+      }
+    },
+    "db-format": {
+      "executor": "nx:run-commands",
+      "options": {
+        "commands": [
+          {
+            "command": "prisma format"
+          }
+        ]
+      }
+    },
+    "db-validate": {
+      "executor": "nx:run-commands",
+      "options": {
+        "commands": [
+          {
+            "command": "prisma validate --schema=apps/backend/prisma/schema.prisma"
+          }
+        ]
+      }
+    },
+    "db-push": {
+      "executor": "nx:run-commands",
+      "options": {
+        "commands": [
+          {
+            "command": "prisma db push --schema=apps/backend/prisma/schema.prisma"
+          }
+        ]
+      }
+    },
+    "db-push-unsafe": {
+      "executor": "nx:run-commands",
+      "options": {
+        "commands": [
+          {
+            "command": "prisma db push --schema=apps/backend/prisma/schema.prisma --accept-data-loss"
+          }
+        ]
+      }
+    },
+    "db-push-reset": {
+      "executor": "nx:run-commands",
+      "options": {
+        "commands": [
+          {
+            "command": "prisma db push --schema=apps/backend/prisma/schema.prisma --force-reset"
+          }
+        ]
+      }
+    },
+    "prisma-studio": {
+      "executor": "nx:run-commands",
+      "options": {
+        "commands": [
+          {
+            "command": "prisma studio --schema=apps/backend/prisma/schema.prisma"
+          }
+        ]
+      }
+    },
+    "db-pull": {
+      "executor": "nx:run-commands",
+      "options": {
+        "commands": [
+          {
+            "command": "prisma db pull --schema=apps/backend/prisma/schema.prisma"
+          }
+        ]
+      }
+    },
+    "db-seed": {
+      "executor": "nx:run-commands",
+      "options": {
+        "commands": [
+          {
+            "command": "prisma db seed --schema=apps/backend/prisma/schema.prisma"
+          }
+        ]
+      }
+    },
+    "db-generate": {
+      "executor": "nx:run-commands",
+      "options": {
+        "commands": [
+          {
+            "command": "prisma generate --schema=apps/backend/prisma/schema.prisma"
+          }
+        ]
+      }
+    },
+    "db-migrate": {
+      "executor": "nx:run-commands",
+      "options": {
+        "commands": [
+          {
+            "command": "prisma migrate dev --schema=apps/backend/prisma/schema.prisma"
+          }
+        ]
+      }
+    }
+  }
+}

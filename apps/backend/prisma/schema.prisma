@@ -1,0 +1,22 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "mysql"
+  url       = env("DB_PRISMA_URL")
+  directUrl = env("DB_PRISMA_URL_NON_POOLING")
+}
+
+model User {
+  id                 String   @id @default(cuid())
+  firstName          String   @map("first_name")
+  lastName           String   @map("last_name")
+  email              String   @unique
+  password           String   @db.LongText
+  resetPasswordToken String?  @map("reset_password_token") @db.LongText
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  @@map("users")
+}
